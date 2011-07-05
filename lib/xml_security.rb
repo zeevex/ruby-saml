@@ -31,10 +31,9 @@ require "digest/sha1"
 require "onelogin/saml/validation_error"
 
 module XMLSecurity
+  DSIG = 'http://www.w3.org/2000/09/xmldsig#'
 
   class SignedDocument < REXML::Document
-    DSIG = "http://www.w3.org/2000/09/xmldsig#"
-
     attr_accessor :signed_element_id
 
     def initialize(response)
@@ -71,18 +70,18 @@ module XMLSecurity
       end
 
       # remove signature node
-      sig_element = REXML::XPath.first(self, "//ds:Signature", {"ds"=>"http://www.w3.org/2000/09/xmldsig#"})
+      sig_element = REXML::XPath.first(self, "//ds:Signature", {"ds"=>DSIG})
       sig_element.remove
 
       # check digests
-      REXML::XPath.each(sig_element, "//ds:Reference", {"ds"=>"http://www.w3.org/2000/09/xmldsig#"}) do |ref|
+      REXML::XPath.each(sig_element, "//ds:Reference", {"ds"=>DSIG}) do |ref|
         uri                           = ref.attributes.get_attribute("URI").value
         hashed_element                = REXML::XPath.first(self, "//[@ID='#{uri[1,uri.size]}']")
         canoner                       = XML::Util::XmlCanonicalizer.new(false, true)
         canoner.inclusive_namespaces  = inclusive_namespaces if canoner.respond_to?(:inclusive_namespaces) && !inclusive_namespaces.empty?
         canon_hashed_element          = canoner.canonicalize(hashed_element)
         hash                          = Base64.encode64(Digest::SHA1.digest(canon_hashed_element)).chomp
-        digest_value                  = REXML::XPath.first(ref, "//ds:DigestValue", {"ds"=>"http://www.w3.org/2000/09/xmldsig#"}).text
+        digest_value                  = REXML::XPath.first(ref, "//ds:DigestValue", {"ds"=>DSIG}).text
 
         if hash != digest_value
           return soft ? false : (raise Onelogin::Saml::ValidationError.new("Digest mismatch"))
@@ -91,10 +90,10 @@ module XMLSecurity
 
       # verify signature
       canoner                 = XML::Util::XmlCanonicalizer.new(false, true)
-      signed_info_element     = REXML::XPath.first(sig_element, "//ds:SignedInfo", {"ds"=>"http://www.w3.org/2000/09/xmldsig#"})
+      signed_info_element     = REXML::XPath.first(sig_element, "//ds:SignedInfo", {"ds"=>DSIG})
       canon_string            = canoner.canonicalize(signed_info_element)
 
-      base64_signature        = REXML::XPath.first(sig_element, "//ds:SignatureValue", {"ds"=>"http://www.w3.org/2000/09/xmldsig#"}).text
+      base64_signature        = REXML::XPath.first(sig_element, "//ds:SignatureValue", {"ds"=>DSIG}).text
       signature               = Base64.decode64(base64_signature)
 
       # get certificate object
