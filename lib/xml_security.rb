@@ -31,7 +31,8 @@ require "digest/sha1"
 require "onelogin/saml/validation_error"
 
 module XMLSecurity
-  DSIG = 'http://www.w3.org/2000/09/xmldsig#'
+  DSIG    = 'http://www.w3.org/2000/09/xmldsig#'
+  CMETHOD = 'http://www.w3.org/2001/10/xml-exc-c14n#'
 
   class SignedDocument < REXML::Document
     attr_accessor :signed_element_id
@@ -112,6 +113,67 @@ module XMLSecurity
     def extract_signed_element_id
       reference_element       = REXML::XPath.first(self, "//ds:Signature/ds:SignedInfo/ds:Reference", {"ds"=>DSIG})
       self.signed_element_id  = reference_element.attribute("URI").value unless reference_element.nil?
+    end
+  end
+
+  class UnsignedDocument < REXML::Document
+    def initialize(request)
+      super(request)
+    end
+
+    def signature(private_key, certificate)
+      # args to XmlCanonicalizer specify the use of Exclusive Canonicalization
+      # as required by the SAML spec. we also disable comments.
+      canoner      = XML::Util::XmlCanonicalizer.new(false, true)
+      canon_string = canoner.canonicalize(self)
+
+      # the use of RSA-SHA1 for the sig and SHA1 for the digest are as specified
+      # in the Signature fragment below.
+      cert_der  = OpenSSL::X509::Certificate.new(certificate).to_der
+      pkey      = OpenSSL::PKey::RSA.new(private_key)
+      signature = pkey.sign(OpenSSL::Digest::SHA1.new, canon_string)
+      digest    = Digest::SHA1.digest(canon_string)
+
+      # the Signature's Reference node must have a URI attribute with
+      # the signed entity's ID value.
+      uri = self.root.attributes.get_attribute("ID").value
+
+      signed_info_element_text =
+          "<ds:SignedInfo xmlns:ds=\"#{DSIG}\">" +
+            "<ds:CanonicalizationMethod Algorithm=\"#{CMETHOD}\"/>" +
+            "<ds:SignatureMethod Algorithm=\"#{DSIG}rsa-sha1\"/>" +
+            "<ds:Reference URI=\"##{uri}\">" +
+              "<ds:Transforms>" +
+                "<ds:Transform Algorithm=\"#{DSIG}enveloped-signature\"/>" +
+                "<ds:Transform Algorithm=\"#{CMETHOD}\"/>" +
+              "</ds:Transforms>" +
+              "<ds:DigestMethod Algorithm=\"#{DSIG}sha1\"/>" +
+              "<ds:DigestValue>#{Base64.encode64(digest).chomp}</ds:DigestValue>" +
+            "</ds:Reference>" +
+          "</ds:SignedInfo>"
+      signed_info_element = REXML::Document.new(signed_info_element_text)
+      # canoner      = XML::Util::XmlCanonicalizer.new(false, true)
+      # signed_string = canoner.canonicalize(signed_info_element)
+      signed_string = XMLSecurity.xmlstarlet_canonicalize(signed_info_element_text)
+
+      cert_der  = OpenSSL::X509::Certificate.new(certificate).to_der
+      pkey      = OpenSSL::PKey::RSA.new(private_key)
+      signature = pkey.sign(OpenSSL::Digest::SHA1.new, signed_string)
+
+      signature =
+        "<ds:Signature xmlns:ds=\"#{DSIG}\">" +
+          signed_string +
+          "<ds:SignatureValue>#{Base64.encode64(signature).chomp}</ds:SignatureValue>" +
+          "<ds:KeyInfo>" +
+            "<ds:X509Data>" +
+              "<ds:X509Certificate>" +
+                "#{Base64.encode64(cert_der)}" +
+              "</ds:X509Certificate>" +
+            "</ds:X509Data>" +
+          "</ds:KeyInfo>" +
+        "</ds:Signature>"
+
+      return signature
     end
   end
 end
