@@ -60,12 +60,11 @@ module XMLSecurity
 
     def validate_doc(base64_cert, soft = true)
       # validate references
-      
+
       # check for inclusive namespaces
-      
       inclusive_namespaces            = []
       inclusive_namespace_element     = REXML::XPath.first(self, "//ec:InclusiveNamespaces")
-      
+
       if inclusive_namespace_element
         prefix_list                   = inclusive_namespace_element.attributes.get_attribute('PrefixList').value
         inclusive_namespaces          = prefix_list.split(" ")
@@ -103,7 +102,7 @@ module XMLSecurity
       cert                    = OpenSSL::X509::Certificate.new(cert_text)
 
       if !cert.public_key.verify(OpenSSL::Digest::SHA1.new, signature, canon_string)
-        return soft ? false : (raise ValidationError.new("Key validation error"))
+        return soft ? false : (raise Onelogin::Saml::ValidationError.new("Key validation error"))
       end
 
       return true
