@@ -15,13 +15,14 @@ module Onelogin::Saml
         "<samlp:NameIDPolicy xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Format=\"#{settings.name_identifier_format}\" AllowCreate=\"true\"></samlp:NameIDPolicy>" +
         "<samlp:RequestedAuthnContext xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" Comparison=\"exact\">" +
         "<saml:AuthnContextClassRef xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\">urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></samlp:RequestedAuthnContext>"
+
       # leave a hole for the signature to slot in
       tail = "</samlp:AuthnRequest>"
 
       if settings.sign_authn_reqs
-        doc = XMLSecurity::UnsignedDocument.new(head + tail)
-        signature = doc.signature(settings.sp_private_key, settings.sp_x509_certificate)
-        request = head + signature + tail
+        doc = XMLSecurity::UnsignedDocument.new(head, tail, uuid)
+        doc.sign(settings.sp_private_key, settings.sp_x509_certificate)
+        request = doc.to_s(:indent => false)
       else
         request = head + tail
       end
@@ -37,6 +38,5 @@ module Onelogin::Saml
 
       settings.idp_sso_target_url + request_params
     end
-
   end
 end

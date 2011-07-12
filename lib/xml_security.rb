@@ -29,6 +29,8 @@ require "openssl"
 require "xmlcanonicalizer"
 require "digest/sha1"
 require "onelogin/saml/validation_error"
+require "libxml"
+require "xmlsec"
 
 module XMLSecurity
   DSIG    = 'http://www.w3.org/2000/09/xmldsig#'
@@ -116,54 +118,47 @@ module XMLSecurity
     end
   end
 
-  class UnsignedDocument < REXML::Document
-    def initialize(request)
-      super(request)
+  class UnsignedDocument
+    def initialize(head, tail, uri)
+      @head = head
+      @tail = tail
+      @uri  = uri
     end
 
-    def signature(private_key, certificate)
-      # args to XmlCanonicalizer specify the use of Exclusive Canonicalization
-      # as required by the SAML spec. we also disable comments.
-      canoner      = XML::Util::XmlCanonicalizer.new(false, true)
-      canon_string = canoner.canonicalize(self)
+    def sign(private_key, certificate)
+      template = create_template(@head, @tail, @uri, certificate)
+      @doc = LibXML::XML::Parser.string(template).parse
+      Xmlsec.sign_document(@doc, private_key)
+    end
 
-      # the use of RSA-SHA1 for the sig and SHA1 for the digest are as specified
-      # in the Signature fragment below.
+    def to_s(options = nil)
+      @doc.to_s(options)
+    end
+
+    private
+
+    def create_template(head, tail, uri, certificate)
       cert_der  = OpenSSL::X509::Certificate.new(certificate).to_der
-      pkey      = OpenSSL::PKey::RSA.new(private_key)
-      signature = pkey.sign(OpenSSL::Digest::SHA1.new, canon_string)
-      digest    = Digest::SHA1.digest(canon_string)
 
-      # the Signature's Reference node must have a URI attribute with
-      # the signed entity's ID value.
-      uri = self.root.attributes.get_attribute("ID").value
-
-      signed_info_element_text =
+      signature_template =
+        "<ds:Signature xmlns:ds=\"#{DSIG}\">" +
           "<ds:SignedInfo xmlns:ds=\"#{DSIG}\">" +
             "<ds:CanonicalizationMethod Algorithm=\"#{CMETHOD}\"/>" +
             "<ds:SignatureMethod Algorithm=\"#{DSIG}rsa-sha1\"/>" +
+            # the Signature's Reference node must have a URI attribute with
+            # the signed entity's ID value.
             "<ds:Reference URI=\"##{uri}\">" +
               "<ds:Transforms>" +
                 "<ds:Transform Algorithm=\"#{DSIG}enveloped-signature\"/>" +
                 "<ds:Transform Algorithm=\"#{CMETHOD}\"/>" +
               "</ds:Transforms>" +
               "<ds:DigestMethod Algorithm=\"#{DSIG}sha1\"/>" +
-              "<ds:DigestValue>#{Base64.encode64(digest).chomp}</ds:DigestValue>" +
+              # DigestValue will be filled in by xmlsec
+              "<ds:DigestValue />" +
             "</ds:Reference>" +
-          "</ds:SignedInfo>"
-      signed_info_element = REXML::Document.new(signed_info_element_text)
-      # canoner      = XML::Util::XmlCanonicalizer.new(false, true)
-      # signed_string = canoner.canonicalize(signed_info_element)
-      signed_string = XMLSecurity.xmlstarlet_canonicalize(signed_info_element_text)
-
-      cert_der  = OpenSSL::X509::Certificate.new(certificate).to_der
-      pkey      = OpenSSL::PKey::RSA.new(private_key)
-      signature = pkey.sign(OpenSSL::Digest::SHA1.new, signed_string)
-
-      signature =
-        "<ds:Signature xmlns:ds=\"#{DSIG}\">" +
-          signed_string +
-          "<ds:SignatureValue>#{Base64.encode64(signature).chomp}</ds:SignatureValue>" +
+          "</ds:SignedInfo>" +
+          # SignatureValue will be filled in by xmlsec
+          "<ds:SignatureValue />" +
           "<ds:KeyInfo>" +
             "<ds:X509Data>" +
               "<ds:X509Certificate>" +
@@ -173,7 +168,7 @@ module XMLSecurity
           "</ds:KeyInfo>" +
         "</ds:Signature>"
 
-      return signature
+      return head + signature_template + tail
     end
   end
 end
