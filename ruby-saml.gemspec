@@ -66,12 +66,14 @@ Gem::Specification.new do |s|
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
       s.add_runtime_dependency(%q<canonix>, ["~> 0.1"])
       s.add_runtime_dependency(%q<uuid>, ["~> 2.3"])
+      s.add_runtime_dependency(%q<libxml-ruby>, ["~> 2.0"])
       s.add_development_dependency(%q<shoulda>, [">= 0"])
       s.add_development_dependency(%q<ruby-debug>, [">= 0"])
       s.add_development_dependency(%q<mocha>, [">= 0"])
     else
       s.add_dependency(%q<canonix>, ["~> 0.1"])
       s.add_dependency(%q<uuid>, ["~> 2.3"])
+      s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
       s.add_dependency(%q<shoulda>, [">= 0"])
       s.add_dependency(%q<ruby-debug>, [">= 0"])
       s.add_dependency(%q<mocha>, [">= 0"])
@@ -79,9 +81,9 @@ Gem::Specification.new do |s|
   else
     s.add_dependency(%q<canonix>, ["~> 0.1"])
     s.add_dependency(%q<uuid>, ["~> 2.3"])
+    s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
     s.add_dependency(%q<shoulda>, [">= 0"])
     s.add_dependency(%q<ruby-debug>, [">= 0"])
     s.add_dependency(%q<mocha>, [">= 0"])
   end
 end
-
