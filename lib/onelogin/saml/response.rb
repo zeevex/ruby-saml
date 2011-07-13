@@ -17,12 +17,12 @@ module Onelogin::Saml
       self.document = XMLSecurity::SignedDocument.new(Base64.decode64(response))
     end
 
-    def is_valid?
-      validate(soft = true)
+    def is_valid?(soft = true)
+      validate(soft)
     end
 
-    def validate!
-      validate(soft = false)
+    def validate!(soft = true)
+      validate(soft)
     end
 
     # The value of the user identifier as designated by the initialization request response
