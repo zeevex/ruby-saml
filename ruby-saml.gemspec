@@ -29,7 +29,6 @@ Gem::Specification.new do |s|
      "lib/onelogin/saml/settings.rb",
      "lib/onelogin/saml/validation_error.rb",
      "lib/ruby-saml.rb",
-     "lib/xml_security.rb",
      "ruby-saml.gemspec",
      "test/certificates/certificate1",
      "test/request_test.rb",
@@ -44,7 +43,6 @@ Gem::Specification.new do |s|
      "test/responses/simple_saml_php.xml",
      "test/settings_test.rb",
      "test/test_helper.rb",
-     "test/xml_security_test.rb"
   ]
   s.homepage = %q{http://github.com/onelogin/ruby-saml}
   s.rdoc_options = ["--charset=UTF-8"]
@@ -56,7 +54,6 @@ Gem::Specification.new do |s|
      "test/response_test.rb",
      "test/settings_test.rb",
      "test/test_helper.rb",
-     "test/xml_security_test.rb"
   ]
 
   if s.respond_to? :specification_version then
@@ -67,6 +64,7 @@ Gem::Specification.new do |s|
       s.add_runtime_dependency(%q<canonix>, ["~> 0.1"])
       s.add_runtime_dependency(%q<uuid>, ["~> 2.3"])
       s.add_runtime_dependency(%q<libxml-ruby>, ["~> 2.0"])
+      s.add_runtime_dependency(%q<xmlsec-ruby>, [">= 0"])
       s.add_development_dependency(%q<shoulda>, [">= 0"])
       s.add_development_dependency(%q<ruby-debug>, [">= 0"])
       s.add_development_dependency(%q<mocha>, [">= 0"])
@@ -74,6 +72,7 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<canonix>, ["~> 0.1"])
       s.add_dependency(%q<uuid>, ["~> 2.3"])
       s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
+      s.add_dependency(%q<xmlsec-ruby>, [">= 0"])
       s.add_dependency(%q<shoulda>, [">= 0"])
       s.add_dependency(%q<ruby-debug>, [">= 0"])
       s.add_dependency(%q<mocha>, [">= 0"])
@@ -82,6 +81,7 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<canonix>, ["~> 0.1"])
     s.add_dependency(%q<uuid>, ["~> 2.3"])
     s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
+    s.add_dependency(%q<xmlsec-ruby>, [">= 0"])
     s.add_dependency(%q<shoulda>, [">= 0"])
     s.add_dependency(%q<ruby-debug>, [">= 0"])
     s.add_dependency(%q<mocha>, [">= 0"])
