@@ -5,9 +5,10 @@ require 'time'
 module Onelogin::Saml
 
   class Response
-    ASSERTION = "urn:oasis:names:tc:SAML:2.0:assertion"
-    PROTOCOL  = "urn:oasis:names:tc:SAML:2.0:protocol"
-    DSIG      = "http://www.w3.org/2000/09/xmldsig#"
+    ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion'
+    PROTOCOL  = 'urn:oasis:names:tc:SAML:2.0:protocol'
+    DSIG      = 'http://www.w3.org/2000/09/xmldsig#'
+    XMLNS     = { 'p' => PROTOCOL, 'a' => ASSERTION, 'ds' => DSIG }
 
     attr_accessor :options, :response, :document, :settings, :soft_errors
 
@@ -31,8 +32,8 @@ module Onelogin::Saml
     # The value of the user identifier as designated by the initialization request response
     def name_id
       @name_id ||= begin
-        nodes = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:NameID", { "p" => PROTOCOL, "a" => ASSERTION })
-        nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}']/a:Assertion/a:Subject/a:NameID", { "p" => PROTOCOL, "a" => ASSERTION })
+        nodes = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:NameID", XMLNS)
+        nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}']/a:Assertion/a:Subject/a:NameID", XMLNS)
         return validation_error("NameId not present") if nodes.nil? or nodes.length == 0
         return validation_error("Too many NameIds (#{nodes.length}") if nodes.length > 1
 
@@ -48,7 +49,7 @@ module Onelogin::Saml
       @attr_statements ||= begin
         result = {}
 
-        attrs = @document.find("/p:Response/a:Assertion/a:AttributeStatement/a:Attribute", { "p" => PROTOCOL, "a" => ASSERTION })
+        attrs = @document.find("/p:Response/a:Assertion/a:AttributeStatement/a:Attribute", XMLNS)
         return {} if attrs.nil? or attrs.length == 0
 
         attrs.each do |a|
@@ -66,15 +67,15 @@ module Onelogin::Saml
     # When this user session should expire at latest
     def session_expires_at
       @expires_at ||= begin
-        node = @document.find("/p:Response/a:Assertion/a:AuthnStatement", { "p" => PROTOCOL, "a" => ASSERTION })
-        node.length > 0 ? parse_time(node, "SessionNotOnOrAfter") : nil
+        nodes = @document.find("/p:Response/a:Assertion/a:AuthnStatement", XMLNS)
+        nodes.length > 0 ? parse_time(nodes, "SessionNotOnOrAfter") : nil
       end
     end
 
     # Conditions (if any) for the assertion to run
     def conditions
       @conditions ||=
-        @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", { "p" => PROTOCOL, "a" => ASSERTION })
+        @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", XMLNS)
     end
 
     private
@@ -102,7 +103,7 @@ module Onelogin::Saml
     def signed_element_id
       @signed_element_id ||=
         begin
-          reference = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", {"ds"=>DSIG})
+          reference = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", XMLNS)
           return validation_error('No Reference node') if reference.nil? or reference.length == 0
           # This is legal in the general Signature case, but not for our SAML use case
           return validation_error("Too many Reference nodes: #{reference.length}") if reference.length > 1
