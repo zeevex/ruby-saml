@@ -23,11 +23,7 @@
 # Portions Copyrighted 2007 Todd W Saxton.
 
 require 'rubygems'
-require "rexml/document"
-require "rexml/xpath"
 require "openssl"
-require "xmlcanonicalizer"
-require "digest/sha1"
 require "onelogin/saml/validation_error"
 require "libxml"
 require "xmlsec"
@@ -35,88 +31,6 @@ require "xmlsec"
 module XMLSecurity
   DSIG    = 'http://www.w3.org/2000/09/xmldsig#'
   CMETHOD = 'http://www.w3.org/2001/10/xml-exc-c14n#'
-
-  class SignedDocument < REXML::Document
-    attr_accessor :signed_element_id
-
-    def initialize(response)
-      super(response)
-      extract_signed_element_id
-    end
-
-    def validate(idp_cert_fingerprint, soft = true)
-      # get cert from response
-      base64_cert = self.elements["//ds:X509Certificate"].text
-      cert_text   = Base64.decode64(base64_cert)
-      cert        = OpenSSL::X509::Certificate.new(cert_text)
-
-      # check cert matches registered idp cert
-      fingerprint = Digest::SHA1.hexdigest(cert.to_der)
-
-      if fingerprint != idp_cert_fingerprint.gsub(/[^a-zA-Z0-9]/,"").downcase
-        return soft ? false : (raise Onelogin::Saml::ValidationError.new("Fingerprint mismatch"))
-      end
-
-      validate_doc(base64_cert, soft)
-    end
-
-    def validate_doc(base64_cert, soft = true)
-      # validate references
-
-      # check for inclusive namespaces
-      inclusive_namespaces            = []
-      inclusive_namespace_element     = REXML::XPath.first(self, "//ec:InclusiveNamespaces")
-
-      if inclusive_namespace_element
-        prefix_list                   = inclusive_namespace_element.attributes.get_attribute('PrefixList').value
-        inclusive_namespaces          = prefix_list.split(" ")
-      end
-
-      # remove signature node
-      sig_element = REXML::XPath.first(self, "//ds:Signature", {"ds"=>DSIG})
-      sig_element.remove
-
-      # check digests
-      REXML::XPath.each(sig_element, "//ds:Reference", {"ds"=>DSIG}) do |ref|
-        uri                           = ref.attributes.get_attribute("URI").value
-        hashed_element                = REXML::XPath.first(self, "//[@ID='#{uri[1,uri.size]}']")
-        canoner                       = XML::Util::XmlCanonicalizer.new(false, true)
-        canoner.inclusive_namespaces  = inclusive_namespaces if canoner.respond_to?(:inclusive_namespaces) && !inclusive_namespaces.empty?
-        canon_hashed_element          = canoner.canonicalize(hashed_element)
-        hash                          = Base64.encode64(Digest::SHA1.digest(canon_hashed_element)).chomp
-        digest_value                  = REXML::XPath.first(ref, "//ds:DigestValue", {"ds"=>DSIG}).text
-
-        if hash != digest_value
-          return soft ? false : (raise Onelogin::Saml::ValidationError.new("Digest mismatch"))
-        end
-      end
-
-      # verify signature
-      canoner                 = XML::Util::XmlCanonicalizer.new(false, true)
-      signed_info_element     = REXML::XPath.first(sig_element, "//ds:SignedInfo", {"ds"=>DSIG})
-      canon_string            = canoner.canonicalize(signed_info_element)
-
-      base64_signature        = REXML::XPath.first(sig_element, "//ds:SignatureValue", {"ds"=>DSIG}).text
-      signature               = Base64.decode64(base64_signature)
-
-      # get certificate object
-      cert_text               = Base64.decode64(base64_cert)
-      cert                    = OpenSSL::X509::Certificate.new(cert_text)
-
-      if !cert.public_key.verify(OpenSSL::Digest::SHA1.new, signature, canon_string)
-        return soft ? false : (raise Onelogin::Saml::ValidationError.new("Key validation error"))
-      end
-
-      return true
-    end
-
-    private
-
-    def extract_signed_element_id
-      reference_element       = REXML::XPath.first(self, "//ds:Signature/ds:SignedInfo/ds:Reference", {"ds"=>DSIG})
-      self.signed_element_id  = reference_element.attribute("URI").value unless reference_element.nil?
-    end
-  end
 
   class UnsignedDocument
     def initialize(head, tail, uri)
