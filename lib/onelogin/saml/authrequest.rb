@@ -14,6 +14,7 @@ module Onelogin::Saml
       @request_id = request_id || '_' + UUID.new.generate
     end
 
+    # return redirect_to URL for HTTP-REDIRECT binding
     def create(settings, params = {})
       request          = authrequest(settings)
       deflated_request = Zlib::Deflate.deflate(request, 9)[2..-5]
@@ -26,6 +27,14 @@ module Onelogin::Saml
       end
 
       settings.idp_sso_target_url + request_params
+    end
+
+    # return encoded request for HTTP-POST binding
+    def encoded_POST_request(settings)
+      request        = authrequest(settings)
+      base64_request = Base64.encode64(request)
+
+      base64_request
     end
 
     private
