@@ -100,22 +100,44 @@ module Onelogin::Saml
       true
     end
 
+    # Assertions or Responses have IDs that should be used to
+    # reference them.  Signed responses have the ID in the Signature's
+    # Reference URI.  If we're not checking signatures, look for it in
+    # the Assertion first, then the Response.
     def signed_element_id
       @signed_element_id ||=
         begin
-          reference = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", XMLNS)
-          return validation_error('No Reference node') if reference.nil? or reference.length == 0
-          # This is legal in the general Signature case, but not for our SAML use case
-          return validation_error("Too many Reference nodes: #{reference.length}") if reference.length > 1
+          # FIXME: support for unsigned responses. Needs support from the app settings, disable for now.
+          # Also consider not ever support unsigned responses.  Ie., yank this code!
+          # if settings.signed_idp_responses
+            references = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", XMLNS)
+            return validation_error('No Reference node') if references.nil? or references.length == 0
 
-          uri = reference.first.attributes["URI"]
-          return validation_error('Reference node has no URI') if uri.nil? or uri.length == 0
+            uris = references.map { |node| node.attributes['URI'] }.compact
+            return validation_error('Reference node has no URI') if uris.nil? or uris.length == 0
 
-          # The URI should be a self-reference with a leading '#'
-          return validation_error("URI is not local: #{uri}") if uri[0] != ?#
+            # FIXME: placeholders for handling multiple Reference nodes.  Jus use the first node for now.
+            # ideally, we'd pick the URI of the Assertion node, if any, over the Response node.
+            # signable_paths = ["/p:Response/a:Assertion[@ID='#{uri}']", "/p:Response[@ID='#{uri}']"]
 
-          # The ID is all but the leading '#'
-          uri[1,uri.length]
+            uri = uris.first
+
+            # The URI should be a self-reference with a leading '#'
+            return validation_error("URI is not local: #{uri}") if uri[0] != ?#
+
+            # The ID is all but the leading '#'
+            uri[1,uri.length]
+          # else
+          #   nodes   = @document.find("/p:Response/a:Assertion[@ID]", XMLNS)
+          #   nodes ||= @document.find("/p:Response[@ID]", XMLNS)
+          #   return validation_error('No Response or Assertion node with ID') if nodes.nil? or nodes.length == 0
+          #   return validation_error("Too many Response/Assertion ID nodes: #{nodes.length}") if nodes.length > 1
+
+          #   id_value = nodes.first.attributes['ID']
+          #   return validation_error('ID node has no ID!') if id_value.nil? or id_value.length == 0
+
+          #   id_value
+          # end
         end
     end
 
