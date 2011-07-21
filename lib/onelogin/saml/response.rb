@@ -32,10 +32,10 @@ module Onelogin::Saml
     # The value of the user identifier as designated by the initialization request response
     def name_id
       @name_id ||= begin
-        nodes = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:NameID", XMLNS)
+        nodes   = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:NameID", XMLNS)
         nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}']/a:Assertion/a:Subject/a:NameID", XMLNS)
         return validation_error("NameId not present") if nodes.nil? or nodes.length == 0
-        return validation_error("Too many NameIds (#{nodes.length}") if nodes.length > 1
+        return validation_error("Too many NameIds (#{nodes.length})") if nodes.length > 1
 
         name_id = nodes[0].content.strip
         return validation_error("NameId is empty") if name_id.empty?
@@ -74,8 +74,7 @@ module Onelogin::Saml
 
     # Conditions (if any) for the assertion to run
     def conditions
-      @conditions ||=
-        @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", XMLNS)
+      @conditions ||= @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", XMLNS)
     end
 
     private
@@ -162,7 +161,7 @@ module Onelogin::Saml
 
     def parse_time(nodes, attribute)
       if nodes.length > 1
-        return validation_error("Too many nodes (#{nodes.length} when parsing time for #{attribute}")
+        return validation_error("Too many nodes (#{nodes.length}) when parsing time for #{attribute}")
       end
 
       if nodes[0].attributes.include? attribute
