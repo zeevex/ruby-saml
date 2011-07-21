@@ -8,10 +8,11 @@ begin
     gem.summary = %Q{SAML Ruby Tookit}
     gem.description = %Q{SAML toolkit for Ruby on Rails}
     gem.email = "support@onelogin.com"
-    gem.homepage = "http://github.com/onelogin/ruby-saml"
-    gem.authors = ["OneLogin LLC"]
-    gem.add_dependency("canonix","~> 0.1")
+    gem.homepage = "http://github.com/zeevex/ruby-saml"
+    gem.authors = ["OneLogin LLC", "Zeevex"]
     gem.add_dependency("uuid","~> 2.3")
+    gem.add_dependency("libxml-ruby","~> 2.0")
+    gem.add_dependency("xmlsec-ruby",">= 0.1")
     gem.add_development_dependency "shoulda"
     gem.add_development_dependency "ruby-debug"
     gem.add_development_dependency "mocha"
