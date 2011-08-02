@@ -23,9 +23,10 @@ module Onelogin::Saml
       self.document = LibXML::XML::Parser.string(saml_response).parse
     end
 
-    def is_valid?
-      validate_response_state &&
-      validate_conditions     &&
+    def is_valid?(request_id)
+      validate_response_state         &&
+      validate_request_id(request_id) &&
+      validate_conditions             &&
       Xmlsec.verify_document(@document, settings.idp_cert)
     end
 
@@ -75,6 +76,29 @@ module Onelogin::Saml
     # Conditions (if any) for the assertion to run
     def conditions
       @conditions ||= @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", XMLNS)
+    end
+
+    # The ID of the SAMLRequest that led to this Response
+    def in_response_to
+      @in_response_to ||= begin
+        # InResponseTo can be an attribute of SubjectConfirmationData or Response
+        nodes   = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData[@InResponseTo]", XMLNS)
+        nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}' and @InResponseTo]", XMLNS)
+        return validation_error("Malformed response (in_response_to)") if nodes.nil? or nodes.length == 0
+
+        # Use the first node if multiple nodes are present
+        nodes.first.attributes['InResponseTo']
+      end
+    end
+
+    def subject_confirmation_data
+      @subject_confirmation_data ||= begin
+        nodes = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData", XMLNS)
+        return validation_error("SubjectConfirmationData not present") if nodes.nil? or nodes.length == 0
+
+        # we use the first node if multiple nodes are present
+        nodes.first.attributes.to_h
+      end
     end
 
     private
@@ -138,6 +162,10 @@ module Onelogin::Saml
           #   id_value
           # end
         end
+    end
+
+    def validate_request_id(request_id)
+      not in_response_to.nil? and request_id == in_response_to
     end
 
     def validate_conditions
