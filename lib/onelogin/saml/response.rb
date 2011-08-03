@@ -23,10 +23,9 @@ module Onelogin::Saml
       self.document = LibXML::XML::Parser.string(saml_response).parse
     end
 
-    def is_valid?(request_id)
-      validate_response_state         &&
-      validate_request_id(request_id) &&
-      validate_conditions             &&
+    def is_valid?
+      validate_response_state &&
+      validate_conditions     &&
       Xmlsec.verify_document(@document, settings.idp_cert)
     end
 
