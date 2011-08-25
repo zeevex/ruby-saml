@@ -32,7 +32,7 @@ module Onelogin::Saml
       validate_response_state &&
       validate_signature      &&
       validate_status_codes   &&
-      validate_conditions
+      validate_timestamps
     end
 
     # The value of the user identifier as designated by the initialization request response
@@ -88,11 +88,6 @@ module Onelogin::Saml
 
     def authn_failed?
       status_code == SC_SUCCESS and sub_status_codes.include?(SC_AUTHNFAILED)
-    end
-
-    # Conditions (if any) for the assertion to run
-    def conditions
-      @conditions ||= @document.find("/p:Response/a:Assertion/a:Conditions", XMLNS)
     end
 
     # The ID of the SAMLRequest that led to this Response
@@ -184,38 +179,37 @@ module Onelogin::Saml
 
     # Validates top-level StatusCode, app must verify subcodes if any
     def validate_status_codes
-      return true if status_code == SC_SUCCESS 
+      return true if status_code == SC_SUCCESS
       return validation_error("Top-level StatusCode is #{status_codes[:top].inspect} (tree is #{status_codes.inspect}")
     end
 
-    def validate_conditions
-      return true if conditions.nil?
-      return true if options[:skip_conditions]
-      return true if sub_status_codes.length > 0
+    def validate_timestamps
+      return true if status_code != SC_SUCCESS or sub_status_codes.length > 0
 
-      if not_before = parse_time(conditions, "NotBefore")
-        if Time.now.utc < not_before
-          return validation_error("Current time is earlier than NotBefore condition")
-        end
-      end
+      # NotBefore & NotOnOrAfter may be in two locations and multiple nodes
+      timestamp_paths = [
+        '/p:Response/a:Assertion/a:Conditions',
+        '/p:Response/a:Assertion/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData',
+      ]
 
-      if not_on_or_after = parse_time(conditions, "NotOnOrAfter")
-        if Time.now.utc >= not_on_or_after
-          return validation_error("Current time is on or after NotOnOrAfter condition")
+      timestamp_paths.each do |xpath|
+        nodes = @document.find(xpath, XMLNS)
+        nodes.each do |node|
+          not_before      = node.attributes['NotBefore']
+          not_on_or_after = node.attributes['NotOnOrAfter']
+          now             = Time.now.utc
+
+          if !not_before.nil? and now < Time.parse(not_before)
+            return validation_error("Current time (#{now}) is NotBefore (#{not_before}")
+          end
+
+          if !not_on_or_after.nil? and now >= Time.parse(not_on_or_after)
+            return validation_error("Current time (#{now}) is NotOnOrAfter (#{not_on_or_after})")
+          end
         end
       end
 
       true
-    end
-
-    def parse_time(nodes, attribute)
-      if nodes.length > 1
-        return validation_error("Too many nodes (#{nodes.length}) when parsing time for #{attribute}")
-      end
-
-      if nodes[0].attributes.include? attribute
-        return Time.parse(nodes[0].attributes[attribute])
-      end
     end
   end
 end
