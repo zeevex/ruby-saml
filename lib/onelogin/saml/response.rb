@@ -61,8 +61,7 @@ module Onelogin::Saml
           name  = a.attributes["Name"]
           value = a.children.first.content.strip
 
-          result[name]        = value
-          result[name.intern] = value
+          result[name] = value
         end
 
         result
