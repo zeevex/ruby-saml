@@ -5,10 +5,15 @@ require 'time'
 module Onelogin::Saml
 
   class Response
+    # XML namespaces used in a SAML 2.0 response
     ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion'
     PROTOCOL  = 'urn:oasis:names:tc:SAML:2.0:protocol'
     DSIG      = 'http://www.w3.org/2000/09/xmldsig#'
     XMLNS     = { 'p' => PROTOCOL, 'a' => ASSERTION, 'ds' => DSIG }
+
+    # Select StatusCode values
+    SC_SUCCESS     = 'urn:oasis:names:tc:SAML:2.0:status:Success'
+    SC_AUTHNFAILED = 'urn:oasis:names:tc:SAML:2.0:status:AuthnFailed'
 
     attr_accessor :options, :response, :document, :settings, :soft_errors
 
@@ -25,19 +30,19 @@ module Onelogin::Saml
 
     def is_valid?
       validate_response_state &&
-      validate_conditions     &&
-      Xmlsec.verify_document(@document, settings.idp_cert)
+      validate_signature      &&
+      validate_status_codes   &&
+      validate_conditions
     end
 
     # The value of the user identifier as designated by the initialization request response
     def name_id
       @name_id ||= begin
-        nodes   = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:NameID", XMLNS)
-        nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}']/a:Assertion/a:Subject/a:NameID", XMLNS)
+        nodes   = @document.find("/p:Response/a:Assertion/a:Subject/a:NameID", XMLNS)
         return validation_error("NameId not present") if nodes.nil? or nodes.length == 0
         return validation_error("Too many NameIds (#{nodes.length})") if nodes.length > 1
 
-        name_id = nodes[0].content.strip
+        name_id = nodes.first.content.strip
         return validation_error("NameId is empty") if name_id.empty?
 
         name_id
@@ -72,35 +77,59 @@ module Onelogin::Saml
       end
     end
 
+    # top-level StatusCode in message
+    def status_code
+      status_codes[:top]
+    end
+
+    # array nested StatusCodes within top-level StatusCode, if any
+    def sub_status_codes
+      status_codes[:sub] || []
+    end
+
+    def authn_failed?
+      status_code == SC_SUCCESS and sub_status_codes.include?(SC_AUTHNFAILED)
+    end
+
     # Conditions (if any) for the assertion to run
     def conditions
-      @conditions ||= @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Conditions", XMLNS)
+      @conditions ||= @document.find("/p:Response/a:Assertion/a:Conditions", XMLNS)
     end
 
     # The ID of the SAMLRequest that led to this Response
     def in_response_to
       @in_response_to ||= begin
         # InResponseTo can be an attribute of SubjectConfirmationData or Response
-        nodes   = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData[@InResponseTo]", XMLNS)
-        nodes ||= @document.find("/p:Response[@ID='#{signed_element_id}' and @InResponseTo]", XMLNS)
-        return validation_error("Malformed response (in_response_to)") if nodes.nil? or nodes.length == 0
+        nodes   = @document.find("/p:Response[@InResponseTo]", XMLNS)
+        nodes ||= @document.find("/p:Response/a:Assertion/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData[@InResponseTo]", XMLNS)
+        return validation_error('Response missing InResponseTo') if nodes.nil? or nodes.length == 0
 
         # Use the first node if multiple nodes are present
         nodes.first.attributes['InResponseTo']
       end
     end
 
-    def subject_confirmation_data
-      @subject_confirmation_data ||= begin
-        nodes = @document.find("/p:Response/a:Assertion[@ID='#{signed_element_id}']/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData", XMLNS)
-        return validation_error("SubjectConfirmationData not present") if nodes.nil? or nodes.length == 0
+    private
 
-        # we use the first node if multiple nodes are present
-        nodes.first.attributes.to_h
+    # The SAML StatusCode elements in this message
+    # Returns a hash with
+    #  :top => top level StatusCode
+    #  :sub => StatusCodes within :top, if any
+    def status_codes
+      @status_codes ||= begin
+        top = @document.find("/p:Response/p:Status/p:StatusCode", XMLNS)
+        return validation_error('No StatusCode element') if top.nil? or top.length == 0
+        return validation_error('Too many top-level StatusCode elements') if top.length > 1
+
+        result = { :top => top.first.attributes['Value'] }
+
+        # since we know that there's only one top level StatusCode, gather any subcodes in one fell swoop
+        subcodes = @document.find("/p:Response/p:Status/p:StatusCode/p:StatusCode", XMLNS)
+        result[:sub] = subcodes.map { |n| n.attributes['Value'] } unless subcodes.nil? or subcodes.length == 0
+
+        result
       end
     end
-
-    private
 
     def validation_error(message)
       return self.soft_errors ? false : raise(ValidationError.new(message))
@@ -122,54 +151,48 @@ module Onelogin::Saml
       true
     end
 
-    # Assertions or Responses have IDs that should be used to
-    # reference them.  Signed responses have the ID in the Signature's
-    # Reference URI.  If we're not checking signatures, look for it in
-    # the Assertion first, then the Response.
-    def signed_element_id
-      @signed_element_id ||=
-        begin
-          # FIXME: support for unsigned responses. Needs support from the app settings, disable for now.
-          # Also consider not ever support unsigned responses.  Ie., yank this code!
-          # if settings.signed_idp_responses
-            references = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", XMLNS)
-            return validation_error('No Reference node') if references.nil? or references.length == 0
+    # Validates the XML Signature on the SAML Response.
+    # Also captures the name and IDs of the elements that have been signed.
+    def validate_signature
+      sigs = @document.find("//ds:Signature/ds:SignedInfo/ds:Reference", XMLNS)
+      return validation_error('No Signature Reference node') if sigs.nil? or sigs.length == 0
 
-            uris = references.map { |node| node.attributes['URI'] }.compact
-            return validation_error('Reference node has no URI') if uris.nil? or uris.length == 0
+      sig_valid = Xmlsec.verify_document(@document, @settings.idp_cert)
+      return validation_error('Signature does not verify') unless sig_valid
 
-            # FIXME: placeholders for handling multiple Reference nodes.  Jus use the first node for now.
-            # ideally, we'd pick the URI of the Assertion node, if any, over the Response node.
-            # signable_paths = ["/p:Response/a:Assertion[@ID='#{uri}']", "/p:Response[@ID='#{uri}']"]
+      # Capture the IDs of elements that were signed
+      uris = sigs.map { |node| node.attributes['URI'] }.compact
+      return validation_error('Reference node has no URI') if uris.nil? or uris.length == 0
 
-            uri = uris.first
+      @signed_element_ids = uris.map do |uri|
+        # The URI should be a self-reference with a leading '#'
+        return validation_error("Reference URI is not local: #{uri}") if uri[0] != ?#
 
-            # The URI should be a self-reference with a leading '#'
-            return validation_error("URI is not local: #{uri}") if uri[0] != ?#
+        # The ID is all but the leading '#'
+        uri[1,uri.length]
+      end
 
-            # The ID is all but the leading '#'
-            uri[1,uri.length]
-          # else
-          #   nodes   = @document.find("/p:Response/a:Assertion[@ID]", XMLNS)
-          #   nodes ||= @document.find("/p:Response[@ID]", XMLNS)
-          #   return validation_error('No Response or Assertion node with ID') if nodes.nil? or nodes.length == 0
-          #   return validation_error("Too many Response/Assertion ID nodes: #{nodes.length}") if nodes.length > 1
+      # verify that at least one of Response or Assertion is a signed element
+      is_signed = @signed_element_ids.any? do |uri|
+        nodes   = @document.find("/p:Response[@ID='#{uri}']", XMLNS)
+        nodes ||= @document.find("/p:Response/a:Assertion[@ID='#{uri}']", XMLNS)
+        !nodes.nil? and nodes.length > 0
+      end
+      return validation_error('Neither Response nor Assertion node is signed') unless is_signed
 
-          #   id_value = nodes.first.attributes['ID']
-          #   return validation_error('ID node has no ID!') if id_value.nil? or id_value.length == 0
-
-          #   id_value
-          # end
-        end
+      true
     end
 
-    def validate_request_id(request_id)
-      not in_response_to.nil? and request_id == in_response_to
+    # Validates top-level StatusCode, app must verify subcodes if any
+    def validate_status_codes
+      return true if status_code == SC_SUCCESS 
+      return validation_error("Top-level StatusCode is #{status_codes[:top].inspect} (tree is #{status_codes.inspect}")
     end
 
     def validate_conditions
       return true if conditions.nil?
       return true if options[:skip_conditions]
+      return true if sub_status_codes.length > 0
 
       if not_before = parse_time(conditions, "NotBefore")
         if Time.now.utc < not_before
