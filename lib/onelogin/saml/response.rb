@@ -68,11 +68,14 @@ module Onelogin::Saml
       end
     end
 
-    # When this user session should expire at latest
+    # Expiry time for this session.  Returns nil if not specified.
     def session_expires_at
-      @expires_at ||= begin
+      @session_expires_at ||= begin
         nodes = @document.find("/p:Response/a:Assertion/a:AuthnStatement", XMLNS)
-        nodes.length > 0 ? parse_time(nodes, "SessionNotOnOrAfter") : nil
+        return nil if nodes.nil?
+
+        # Use the earliest time
+        nodes.map {|n| Time.parse(n.attributes['SessionNotOnOrAfter']) }.min
       end
     end
 
