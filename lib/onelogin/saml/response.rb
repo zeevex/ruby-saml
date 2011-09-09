@@ -1,5 +1,6 @@
 require "xml_security"
 require "time"
+require "date"
 
 module Onelogin::Saml
 
@@ -130,7 +131,8 @@ module Onelogin::Saml
 
     def parse_time(node, attribute)
       if node && node.attributes[attribute]
-        Time.parse(node.attributes[attribute])
+        # doing this for ISO9601-style date parsing and conversion to Time object
+        Time.parse(DateTime.parse(node.attributes[attribute]).to_s)
       end
     end
   end
