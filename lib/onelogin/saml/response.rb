@@ -75,7 +75,10 @@ module Onelogin::Saml
         return nil if nodes.nil?
 
         # Use the earliest time
-        nodes.map {|n| Time.parse(n.attributes['SessionNotOnOrAfter']) }.min
+        nodes.map     {|n| n.attributes['SessionNotOnOrAfter'] }.
+              reject  {|t| t.nil? }.
+              map     {|t| Time.parse(DateTime.parse(t).to_s) }.
+              min
       end
     end
 
