@@ -100,8 +100,8 @@ module Onelogin::Saml
     def in_response_to
       @in_response_to ||= begin
         # InResponseTo can be an attribute of SubjectConfirmationData or Response
-        nodes   = @document.find("/p:Response[@InResponseTo]", XMLNS)
-        nodes ||= @document.find("/p:Response/a:Assertion/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData[@InResponseTo]", XMLNS)
+        nodes = @document.find("/p:Response[@InResponseTo]", XMLNS)
+        nodes = @document.find("/p:Response/a:Assertion/a:Subject/a:SubjectConfirmation/a:SubjectConfirmationData[@InResponseTo]", XMLNS) if (nodes.length == 0)
         return validation_error('Response missing InResponseTo') if nodes.nil? or nodes.length == 0
 
         # Use the first node if multiple nodes are present
@@ -174,8 +174,8 @@ module Onelogin::Saml
 
       # verify that at least one of Response or Assertion is a signed element
       is_signed = @signed_element_ids.any? do |uri|
-        nodes   = @document.find("/p:Response[@ID='#{uri}']", XMLNS)
-        nodes ||= @document.find("/p:Response/a:Assertion[@ID='#{uri}']", XMLNS)
+        nodes = @document.find("/p:Response[@ID='#{uri}']", XMLNS)
+        nodes = @document.find("/p:Response/a:Assertion[@ID='#{uri}']", XMLNS) if (nodes.length == 0)
         !nodes.nil? and nodes.length > 0
       end
       return validation_error('Neither Response nor Assertion node is signed') unless is_signed
