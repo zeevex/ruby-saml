@@ -11,8 +11,6 @@ begin
     gem.homepage = "http://github.com/zeevex/ruby-saml"
     gem.authors = ["OneLogin LLC", "Zeevex"]
     gem.add_dependency("uuid","~> 2.3")
-    gem.add_dependency("libxml-ruby","~> 2.0")
-    gem.add_dependency("xmlsec-ruby",">= 0.1")
     gem.add_development_dependency "shoulda"
     gem.add_development_dependency "ruby-debug"
     gem.add_development_dependency "mocha"

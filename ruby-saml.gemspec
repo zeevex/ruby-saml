@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{ruby-saml}
-  s.version = "0.4.7.9"
+  s.version = "0.4.7.6"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.authors = ["OneLogin LLC", "Zeevex"]
-  s.date = %q{2011-09-14}
+  s.authors = [%q{OneLogin LLC}, %q{Zeevex}]
+  s.date = %q{2011-11-09}
   s.description = %q{SAML toolkit for Ruby on Rails}
   s.email = %q{support@onelogin.com}
   s.extra_rdoc_files = [
@@ -44,8 +44,8 @@ Gem::Specification.new do |s|
     "test/test_helper.rb"
   ]
   s.homepage = %q{http://github.com/zeevex/ruby-saml}
-  s.require_paths = ["lib"]
-  s.rubygems_version = %q{1.6.2}
+  s.require_paths = [%q{lib}]
+  s.rubygems_version = %q{1.8.9}
   s.summary = %q{SAML Ruby Tookit}
 
   if s.respond_to? :specification_version then
@@ -53,23 +53,17 @@ Gem::Specification.new do |s|
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
       s.add_runtime_dependency(%q<uuid>, ["~> 2.3"])
-      s.add_runtime_dependency(%q<libxml-ruby>, ["~> 2.0"])
-      s.add_runtime_dependency(%q<xmlsec-ruby>, [">= 0.1"])
       s.add_development_dependency(%q<shoulda>, [">= 0"])
       s.add_development_dependency(%q<ruby-debug>, [">= 0"])
       s.add_development_dependency(%q<mocha>, [">= 0"])
     else
       s.add_dependency(%q<uuid>, ["~> 2.3"])
-      s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
-      s.add_dependency(%q<xmlsec-ruby>, [">= 0.1"])
       s.add_dependency(%q<shoulda>, [">= 0"])
       s.add_dependency(%q<ruby-debug>, [">= 0"])
       s.add_dependency(%q<mocha>, [">= 0"])
     end
   else
     s.add_dependency(%q<uuid>, ["~> 2.3"])
-    s.add_dependency(%q<libxml-ruby>, ["~> 2.0"])
-    s.add_dependency(%q<xmlsec-ruby>, [">= 0.1"])
     s.add_dependency(%q<shoulda>, [">= 0"])
     s.add_dependency(%q<ruby-debug>, [">= 0"])
     s.add_dependency(%q<mocha>, [">= 0"])

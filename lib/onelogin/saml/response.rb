@@ -1,5 +1,3 @@
-require 'libxml'
-require 'xmlsec'
 require 'time'
 
 module Onelogin::Saml

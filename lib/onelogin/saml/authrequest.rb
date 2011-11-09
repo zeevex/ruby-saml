@@ -2,8 +2,6 @@ require 'base64'
 require 'uuid'
 require 'zlib'
 require 'cgi'
-require 'libxml'
-require 'xmlsec'
 
 module Onelogin::Saml
   class Authrequest
@@ -54,8 +52,8 @@ module Onelogin::Saml
 
       if settings.sign_authn_reqs
         template = head + signature_template(@request_id, settings.sp_x509_certificate) + tail
-        document = LibXML::XML::Parser.string(template).parse
-        Xmlsec.sign_document(document, settings.sp_private_key)
+#        document = LibXML::XML::Parser.string(template).parse
+#        Xmlsec.sign_document(document, settings.sp_private_key)
 
         # disable indentation, it invalidates the digest in the signature
         request = document.to_s(:indent => false)
