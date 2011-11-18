@@ -2,9 +2,20 @@ require 'base64'
 require 'uuid'
 require 'zlib'
 require 'cgi'
+require 'java'
+require 'mvn:xerces:xercesImpl'
+require 'mvn:commons-logging:commons-logging-api'
+require 'mvn:org.apache.santuario:xmlsec'
 
 module Onelogin::Saml
   class Authrequest
+
+    import java.io.ByteArrayInputStream
+    import javax.xml.parsers.DocumentBuilderFactory
+    import org.apache.xml.security.signature.XMLSignature
+    import javax.xml.crypto.dsig.XMLSignatureFactory  
+    import javax.xml.crypto.dsig.Reference
+
     DSIG    = 'http://www.w3.org/2000/09/xmldsig#'
     CMETHOD = 'http://www.w3.org/2001/10/xml-exc-c14n#'
 
