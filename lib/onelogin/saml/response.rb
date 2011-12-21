@@ -77,7 +77,7 @@ module Onelogin::Saml
         # Use the earliest time
         nodes.map     {|n| n.attributes['SessionNotOnOrAfter'] }.
               reject  {|t| t.nil? }.
-              map     {|t| Time.parse(DateTime.parse(t).to_s) }.
+              map     {|t| Time.parse(DateTime.parse(t).to_s) }. # converts the date using DateTime parser and then returns it in local time
               min
       end
     end
@@ -114,11 +114,10 @@ module Onelogin::Saml
       @issue_instant ||= begin
         # IssueInstant can be an attribute of the Assertion or Response but we only consider 
         # an IssueInstant inside the assertion to be valid
-        node = @document.find("/p:Response/a:Assertion[@IssueInstant]", XMLNS)
-        return validation_error('Response missing IssueInstant') if node.nil? or node.length == 0
+        node = @document.find("/p:Response/a:Assertion[@IssueInstant]", XMLNS).first
+        return validation_error('Response missing IssueInstant') if node.nil?
         
-        # Use the first node if multiple are present
-        node.first.attributes['IssueInstant']
+        Time.parse(DateTime.parse(node.attributes['IssueInstant']).to_s)
       end
     end
 
