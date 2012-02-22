@@ -114,10 +114,10 @@ module Onelogin::Saml
       @issue_instant ||= begin
         # IssueInstant can be an attribute of the Assertion or Response but we only consider 
         # an IssueInstant inside the assertion to be valid
-        node = @document.find("/p:Response/a:Assertion[@IssueInstant]", XMLNS).first
-        return validation_error('Response missing IssueInstant') if node.nil?
+        node = @document.find("/p:Response/a:Assertion[@IssueInstant]", XMLNS)
+        return validation_error('Response missing IssueInstant') if node.nil? || node.length == 0
         
-        Time.parse(DateTime.parse(node.attributes['IssueInstant']).to_s)
+        Time.parse(DateTime.parse(node.first.attributes['IssueInstant']).to_s)
       end
     end
 
